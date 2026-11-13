@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#1b1d22" />
+<title>Pocket Racers — prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --red: #e23b3b; --yellow: #ffc83a; --blue: #2f6fd6; --ink: #1b1d22; --cream: #fff8ec;
+    --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1d22; font-family: 'Nunito', system-ui, sans-serif; color: var(--ink);
+    user-select: none; -webkit-user-select: none; touch-action: none; overscroll-behavior: none; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .hidden { display: none !important; }
+  .display { font-family: 'Lilita One', 'Arial Black', sans-serif; letter-spacing: .02em; }
+
+  /* ------------------------------------------------ HUD */
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  .chip { position: absolute; background: var(--cream); border: 3px solid var(--ink); border-radius: 14px; padding: 6px 14px;
+    box-shadow: 0 4px 0 var(--ink); font-family: 'Lilita One', sans-serif; font-size: 22px; }
+  #hudLap { top: calc(12px + var(--safe-t)); left: calc(12px + var(--safe-l)); transform: rotate(-2deg); }
+  #hudLap b { color: var(--red); font-weight: normal; font-size: 30px; }
+  #hudTimes { top: calc(12px + var(--safe-t)); right: calc(12px + var(--safe-r)); text-align: right; transform: rotate(1.5deg); }
+  #hudTime { font-size: 30px; }
+  #hudLapTime, #hudBest { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 13px; opacity: .75; }
+  #hudMsg { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%) scale(.6); opacity: 0;
+    font-family: 'Lilita One', sans-serif; font-size: 42px; color: #fff; -webkit-text-stroke: 2px var(--ink);
+    text-shadow: 0 5px 0 var(--ink); transition: transform .15s cubic-bezier(.3,1.6,.6,1), opacity .15s; white-space: nowrap; }
+  #hudMsg.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  #hudMsg.big { font-size: 84px; }
+  #hudMsg.go { color: var(--yellow); }
+  #hudMsg.blue { color: #47c6ff; }
+  #hudMsg.orange { color: #ff8a1f; }
+  #hudMsg.record { color: var(--yellow); font-size: 40px; }
+  #driftWrap { position: absolute; left: 50%; bottom: calc(26px + var(--safe-b)); width: 180px; height: 14px; transform: translateX(-50%);
+    background: rgba(27,29,34,.55); border: 2px solid var(--ink); border-radius: 8px; overflow: hidden; opacity: 0; transition: opacity .15s; }
+  #driftWrap.on { opacity: 1; }
+  #driftWrap::after { content: ''; position: absolute; left: 47%; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,.6); }
+  #driftGauge { height: 100%; width: 0; background: #ffe9a0; }
+  #driftGauge.lvl1 { background: #47c6ff; } #driftGauge.lvl2 { background: #ff8a1f; }
+  body.touch #driftWrap { bottom: calc(150px + var(--safe-b)); }
+
+  /* ------------------------------------------------ écrans */
+  .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px;
+    background: radial-gradient(ellipse at center, rgba(27,29,34,.15), rgba(27,29,34,.55)); }
+  .card { background: var(--cream); border: 4px solid var(--ink); border-radius: 22px; box-shadow: 0 8px 0 var(--ink);
+    padding: 22px 26px; max-width: 460px; width: 100%; text-align: center; max-height: 100%; overflow: auto; }
+  .logo { font-family: 'Lilita One', sans-serif; font-size: 54px; line-height: .95; margin: 0 0 4px; color: var(--red);
+    -webkit-text-stroke: 2px var(--ink); text-shadow: 0 5px 0 var(--ink); transform: rotate(-3deg); }
+  .logo span { color: var(--yellow); }
+  .tag { font-weight: 800; opacity: .7; margin: 10px 0 16px; font-size: 14px; }
+  .btn { display: block; width: 100%; font-family: 'Lilita One', sans-serif; font-size: 26px; padding: 12px; margin: 10px 0 0; cursor: pointer;
+    background: var(--yellow); color: var(--ink); border: 3px solid var(--ink); border-radius: 14px; box-shadow: 0 5px 0 var(--ink);
+    transition: transform .08s; }
+  .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+  .btn.red { background: var(--red); color: #fff; }
+  .row { display: flex; gap: 8px; }
+  .row .btn { font-size: 15px; padding: 9px 6px; font-family: 'Nunito', sans-serif; font-weight: 800; background: #fff; }
+  .help { text-align: left; font-size: 13.5px; margin-top: 16px; background: #f3e7d2; border-radius: 12px; padding: 10px 14px; line-height: 1.55; }
+  .help b { display: inline-block; min-width: 92px; }
+  kbd { font-family: inherit; font-weight: 800; background: #fff; border: 2px solid var(--ink); border-bottom-width: 3px; border-radius: 6px; padding: 0 5px; font-size: 12px; }
+  #resLaps { list-style: none; padding: 0; margin: 10px 0; font-weight: 800; }
+  #resLaps li.best { color: var(--red); }
+  #resTotal { font-family: 'Lilita One', sans-serif; font-size: 44px; }
+  #resBest { font-size: 13px; opacity: .7; font-weight: 800; }
+
+  /* ------------------------------------------------ tactile */
+  #touch { position: fixed; inset: 0; pointer-events: none; display: none; }
+  body.touch.playing #touch { display: block; }
+  #stickZone { position: absolute; left: 0; bottom: 0; width: 50%; height: 70%; pointer-events: auto; }
+  #stickBase { position: fixed; width: 130px; height: 130px; margin: -65px 0 0 -65px; border-radius: 50%;
+    background: rgba(255,248,236,.18); border: 3px solid rgba(255,248,236,.5); display: none; }
+  #stickBase.on { display: block; }
+  #stickKnob { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; border-radius: 50%; transform: translate(-50%,-50%);
+    background: var(--cream); border: 3px solid var(--ink); }
+  .tbtn { position: absolute; pointer-events: auto; border-radius: 50%; border: 4px solid var(--ink); box-shadow: 0 5px 0 var(--ink);
+    font-family: 'Lilita One', sans-serif; display: flex; align-items: center; justify-content: center; color: var(--ink); }
+  .tbtn.on { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); filter: brightness(1.1); }
+  #btnDrift { right: calc(24px + var(--safe-r)); bottom: calc(30px + var(--safe-b)); width: 110px; height: 110px; background: var(--yellow); font-size: 22px; }
+  #btnBrake { right: calc(150px + var(--safe-r)); bottom: calc(24px + var(--safe-b)); width: 76px; height: 76px; background: #fff; font-size: 16px; }
+  #touchHint { position: absolute; left: calc(20px + var(--safe-l)); bottom: calc(24px + var(--safe-b)); color: #fff; font-weight: 800; font-size: 13px;
+    text-shadow: 0 2px 3px rgba(0,0,0,.6); opacity: .8; }
+  .mini { position: absolute; top: calc(70px + var(--safe-t)); width: 44px; height: 44px; pointer-events: auto; border-radius: 12px;
+    border: 3px solid var(--ink); background: var(--cream); font-size: 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 0 var(--ink); }
+  #tPause { right: calc(12px + var(--safe-r)); top: calc(86px + var(--safe-t)); }
+  #tCam { right: calc(64px + var(--safe-r)); top: calc(86px + var(--safe-t)); }
+  #tReset { right: calc(116px + var(--safe-r)); top: calc(86px + var(--safe-t)); }
+  #rotate { display: none; }
+  @media (orientation: portrait) and (pointer: coarse) {
+    body.touch #rotate { display: block; position: fixed; top: calc(70px + var(--safe-t)); left: 50%; transform: translateX(-50%); background: rgba(27,29,34,.75);
+      color: #fff; padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 800; pointer-events: none; }
+  }
+  @media (max-height: 480px) {
+    .logo { font-size: 40px; } .card { padding: 14px 18px; } .btn { font-size: 22px; padding: 8px; }
+    .help { font-size: 12px; margin-top: 10px; } #hudMsg.big { font-size: 64px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="hudLap" class="chip">TOUR <b>1</b>/3</div>
+  <div id="hudTimes" class="chip"><div id="hudTime">0:00.00</div><div id="hudLapTime"></div><div id="hudBest"></div></div>
+  <div id="hudMsg"></div>
+  <div id="driftWrap"><div id="driftGauge"></div></div>
+</div>
+
+<div id="touch">
+  <div id="stickZone"></div>
+  <div id="stickBase"><div id="stickKnob"></div></div>
+  <div id="touchHint">◀ glisse pour tourner ▶</div>
+  <div id="btnDrift" class="tbtn">DRIFT</div>
+  <div id="btnBrake" class="tbtn">FREIN</div>
+  <div id="tPause" class="mini" title="Pause">❚❚</div>
+  <div id="tCam" class="mini" title="Caméra">🎥</div>
+  <div id="tReset" class="mini" title="Replacer">↺</div>
+  <div id="rotate">Tourne ton appareil à l'horizontale pour mieux voir</div>
+</div>
+
+<div id="menu" class="screen">
+  <div class="card">
+    <h1 class="logo">POCKET<br><span>RACERS</span></h1>
+    <div class="tag">Prototype · Circuit « Table de la cuisine » · 4 tours</div>
+    <button id="btnPlay" class="btn red">JOUER</button>
+    <div class="row">
+      <button id="btnQuality" class="btn">Qualité : <span id="qualityLabel">Auto</span></button>
+      <button id="btnSound" class="btn">Son : activé</button>
+      <button id="btnFull" class="btn">Plein écran</button>
+    </div>
+    <div id="helpKeys" class="help">
+      <b>Conduire</b> <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> ou <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><br>
+      <b>Drift</b> <kbd>Espace</kbd> en tournant, maintiens puis relâche → turbo<br>
+      <b>Caméra</b> <kbd>C</kbd> &nbsp; <b style="min-width:0">Replacer</b> <kbd>R</kbd> &nbsp; <b style="min-width:0">Pause</b> <kbd>Échap</kbd><br>
+      <b>Départ turbo</b> accélère juste après le « 1 »
+    </div>
+    <div id="helpPad" class="help hidden">
+      <b>Accélérer</b> RT ou A &nbsp;·&nbsp; <b style="min-width:0">Freiner</b> LT ou X<br>
+      <b>Diriger</b> stick gauche ou croix<br>
+      <b>Drift</b> RB / LB / B en tournant, puis relâche → turbo<br>
+      <b>Replacer</b> Y &nbsp;·&nbsp; <b style="min-width:0">Caméra</b> Select &nbsp;·&nbsp; <b style="min-width:0">Pause</b> Start
+    </div>
+    <div id="helpTouch" class="help hidden">
+      <b>Accélération</b> automatique<br>
+      <b>Diriger</b> glisse ton pouce gauche à gauche / droite<br>
+      <b>Drift</b> maintiens DRIFT en tournant, relâche → turbo<br>
+      <b>Freiner</b> bouton FREIN (marche arrière si arrêté)
+    </div>
+  </div>
+</div>
+
+<div id="pause" class="screen hidden">
+  <div class="card">
+    <h2 class="logo" style="font-size:44px">PAUSE</h2>
+    <button id="btnResume" class="btn red">REPRENDRE</button>
+    <button id="btnRestart" class="btn">RECOMMENCER</button>
+    <button id="btnQuit" class="btn">MENU</button>
+  </div>
+</div>
+
+<div id="results" class="screen hidden">
+  <div class="card">
+    <h2 class="logo" style="font-size:44px">ARRIVÉE !</h2>
+    <div id="resTotal"></div>
+    <ul id="resLaps"></ul>
+    <div id="resBest"></div>
+    <button id="btnRetry" class="btn red">REJOUER</button>
+    <button id="btnMenu" class="btn">MENU</button>
+  </div>
+</div>
+
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
