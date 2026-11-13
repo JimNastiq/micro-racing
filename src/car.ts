@@ -34,7 +34,11 @@ export const TUNING = {
   radius: 2.0,
   driftLvl1: 0.75,
   driftLvl2: 1.6,
+  stepH: 1.7,     // marche franchissable
+  halfW: 1.3,     // demi-largeur (collisions avec les objets)
+  halfL: 2.3,     // demi-longueur
 };
+export type Tuning = typeof TUNING;
 
 export class Car {
   // état physique
@@ -53,6 +57,10 @@ export class Car {
   surface: 'slip' | 'slow' | null = null;
   frozen = false;
   events: CarEvent[] = [];
+  /** réglages de conduite propres à la voiture choisie */
+  t: Tuning = { ...TUNING };
+  private modelObj: THREE.Object3D | null = null;
+  private len = 5.3;
 
   // visuel
   mesh = new THREE.Group();
@@ -193,7 +201,7 @@ export class Car {
   }
 
   step(dt: number, c: Controls, world: World) {
-    const T = TUNING;
+    const T = this.t;
     if (this.falling) {
       this.fallTime += dt;
       this.vy -= T.fallGravity * dt;
@@ -310,7 +318,7 @@ export class Car {
     this.x = nx; this.z = nz;
 
     // --- vertical
-    const g = world.groundAt(this.x, this.z, this.y);
+    const g = world.groundAt(this.x, this.z, this.y, T.stepH);
     if (this.onGround) {
       if (g < this.y - 0.8) {
         this.onGround = false;
@@ -364,10 +372,10 @@ export class Car {
   private hitProps(world: World, x: number, z: number): boolean {
     const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
     const sx = Math.cos(this.heading), sz = -Math.sin(this.heading);
-    const y = this.y;
-    return world.blocked(x, z, y) ||
-      world.blocked(x + fx * 2.3, z + fz * 2.3, y) || world.blocked(x - fx * 2.3, z - fz * 2.3, y) ||
-      world.blocked(x + sx * 1.3, z + sz * 1.3, y) || world.blocked(x - sx * 1.3, z - sz * 1.3, y);
+    const y = this.y, st = this.t.stepH, L = this.t.halfL, W = this.t.halfW;
+    return world.blocked(x, z, y, st) ||
+      world.blocked(x + fx * L, z + fz * L, y, st) || world.blocked(x - fx * L, z - fz * L, y, st) ||
+      world.blocked(x + sx * W, z + sz * W, y, st) || world.blocked(x - sx * W, z - sz * W, y, st);
   }
 
   /** Remplace la carrosserie procédurale par un modèle 3D (avant du modèle vers -X) */
@@ -375,6 +383,9 @@ export class Car {
     const box = new THREE.Box3().setFromObject(model);
     const s = length / (box.max.x - box.min.x);
     const m = model.clone(true);
+    if (this.modelObj) this.body.remove(this.modelObj);
+    this.len = length;
+    this.modelObj = m;
     m.scale.setScalar(s);
     m.rotation.y = Math.PI / 2;
     m.position.y = -box.min.y * s;
@@ -382,7 +393,7 @@ export class Car {
     for (const w of this.wheels) w.visible = false;
     m.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     this.body.add(m);
-    this.flame.position.set(0, 0.75, -2.9);
+    this.flame.position.set(0, 0.75 * (length / 5.3), -length * 0.55);
   }
 
   /** Animation visuelle (indépendante du pas physique) */
@@ -432,15 +443,16 @@ export class Car {
   rearWheels(): [THREE.Vector3, THREE.Vector3] {
     const h = this.heading - this.visSlip;
     const fx = Math.sin(h), fz = Math.cos(h), sx = Math.cos(h), sz = -Math.sin(h);
+    const b = this.len / 5.3;
     const mk = (side: number) => new THREE.Vector3(
-      this.x - fx * 1.9 + sx * side * 1.3, this.y + 0.2, this.z - fz * 1.9 + sz * side * 1.3);
+      this.x - fx * 1.9 * b + sx * side * this.t.halfW, this.y + 0.2, this.z - fz * 1.9 * b + sz * side * this.t.halfW);
     return [mk(-1), mk(1)];
   }
 
   exhaust(): THREE.Vector3 {
     const h = this.heading - this.visSlip;
     const fx = Math.sin(h), fz = Math.cos(h);
-    return new THREE.Vector3(this.x - fx * 3.2, this.y + 0.75 + this.hop, this.z - fz * 3.2);
+    return new THREE.Vector3(this.x - fx * this.len * 0.6, this.y + 0.75 * this.len / 5.3 + this.hop, this.z - fz * this.len * 0.6);
   }
 }
 

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
-export const MODEL_NAMES = ['car', 'table', 'track_straight', 'tunnel', 'soap', 'mug', 'juicebox', 'track_ramp'] as const;
+export const MODEL_NAMES = ['car', 'car_challenger', 'car_monster', 'table', 'track_straight', 'tunnel', 'soap', 'mug', 'juicebox', 'track_ramp'] as const;
 export type ModelName = typeof MODEL_NAMES[number];
 
 /** Grille d'intervalles solides verticaux pré-calculée hors-ligne (voir tools/heightfield.mjs) */

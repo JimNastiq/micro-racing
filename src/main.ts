@@ -7,7 +7,8 @@ import { N8AOPostPass } from 'n8ao';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { Track } from './track';
 import { World, TABLE_HW, TABLE_HD, TABLE_S } from './world';
-import { loadAssets } from './assets';
+import { loadAssets, Assets } from './assets';
+import { CARS } from './cars';
 import { Car, TUNING } from './car';
 import { Input } from './input';
 import { Particles } from './fx';
@@ -142,7 +143,7 @@ function resize() {
 window.addEventListener('resize', resize);
 
 // ============================================================ état de la course
-type State = 'menu' | 'countdown' | 'race' | 'finished' | 'paused';
+type State = 'menu' | 'select' | 'countdown' | 'race' | 'finished' | 'paused';
 let state: State = 'menu';
 let pausedFrom: State = 'race';
 let countdown = 0;
@@ -177,8 +178,8 @@ function message(text: string, dur = 1.2, cls = '') {
 }
 
 function show(id: string | null) {
-  for (const s of ['menu', 'pause', 'results']) $(s).classList.toggle('hidden', s !== id);
-  $('hud').classList.toggle('hidden', id === 'menu');
+  for (const s of ['menu', 'select', 'pause', 'results']) $(s).classList.toggle('hidden', s !== id);
+  $('hud').classList.toggle('hidden', id === 'menu' || id === 'select');
   document.body.classList.toggle('playing', id === null);
 }
 
@@ -288,7 +289,7 @@ function desiredCamera(out: THREE.Vector3, look: THREE.Vector3) {
   if (camMode === 0) {
     // vue du dessus inclinée, orientation fixe (façon Micro Machines)
     look.set(car.x + car.vx * 0.32, Math.max(car.y, -60) * 0.85, car.z + car.vz * 0.32);
-    const zoom = (1 + Math.min(sp, 110) / TUNING.maxSpeed * 0.18) * (portrait ? 1.55 : 1);
+    const zoom = (1 + Math.min(sp, 110) / car.t.maxSpeed * 0.18) * (portrait ? 1.55 : 1);
     out.set(look.x, look.y + 64 * zoom, look.z + 46 * zoom);
   } else {
     // caméra poursuite
@@ -404,7 +405,46 @@ function startGame(e?: Event) {
   if (e && (e as PointerEvent).pointerType === 'touch') { input.touchActive = true; input.lastDevice = 'touch'; refreshTouchUi(); }
   resetRace();
 }
-$('btnPlay').addEventListener('click', (e) => { if (ready) startGame(e); });
+// ------------------------------------------------------------ choix de la voiture
+let assetsRef: Assets | null = null;
+let carIdx = Math.max(0, Math.min(CARS.length - 1, loadNum('mr_car') ?? 0));
+let selSpin = 0;
+let prevSteerDir = 0;
+function applyCar(i: number) {
+  carIdx = (i + CARS.length) % CARS.length;
+  const def = CARS[carIdx];
+  if (assetsRef) car.setModel(assetsRef.models[def.model], def.length);
+  car.t = { ...TUNING, ...def.tuning };
+  saveNum('mr_car', carIdx);
+  $('carName').textContent = def.name;
+  $('carName').style.color = def.accent;
+  $('carTag').textContent = def.tagline;
+  document.querySelectorAll<HTMLElement>('.bar').forEach((b) => {
+    const v = def.stats[b.dataset.k as keyof typeof def.stats];
+    b.style.setProperty('--accent', def.accent);
+    b.innerHTML = Array.from({ length: 5 }, (_, k) => `<i class="${k < v ? 'on' : ''}"></i>`).join('');
+  });
+  $('selDots').innerHTML = CARS.map((_, k) => `<b class="${k === carIdx ? 'on' : ''}"></b>`).join('');
+}
+function openSelect(e?: Event) {
+  if (!ready) return;
+  sfx.init();
+  if (e && (e as PointerEvent).pointerType === 'touch') { input.touchActive = true; input.lastDevice = 'touch'; refreshTouchUi(); }
+  state = 'select';
+  // vitrine : la voiture tourne sur la ligne droite de départ
+  const p = track.at(0.03, 0);
+  car.place(p.x, p.z, p.heading, track.roadTop);
+  car.frozen = true;
+  applyCar(carIdx);
+  show('select');
+}
+function changeCar(d: number) { applyCar(carIdx + d); sfx.beep(false); }
+$('selPrev').addEventListener('click', () => changeCar(-1));
+$('selNext').addEventListener('click', () => changeCar(1));
+$('selGo').addEventListener('click', (e) => startGame(e));
+$('selBack').addEventListener('click', () => { state = 'menu'; show('menu'); });
+
+$('btnPlay').addEventListener('click', (e) => openSelect(e));
 $('btnRetry').addEventListener('click', startGame);
 $('btnMenu').addEventListener('click', () => { state = 'menu'; show('menu'); });
 $('btnResume').addEventListener('click', () => togglePause());
@@ -461,9 +501,16 @@ function frame(now: number) {
   last = now;
   input.poll();
 
-  if (input.pause && state !== 'menu' && state !== 'finished') togglePause();
+  if (state === 'select') {
+    const dir = input.steer > 0.5 ? 1 : input.steer < -0.5 ? -1 : 0;
+    if (dir && dir !== prevSteerDir) changeCar(dir);
+    prevSteerDir = dir;
+    if (input.pause) { state = 'menu'; show('menu'); }
+  } else if (input.pause && state !== 'menu' && state !== 'finished') togglePause();
   if (input.confirm) {
-    if ((state === 'menu' && ready) || (state === 'finished' && !$('results').classList.contains('hidden'))) startGame();
+    if (state === 'menu' && ready) openSelect();
+    else if (state === 'select') startGame();
+    else if (state === 'finished' && !$('results').classList.contains('hidden')) startGame();
     else if (state === 'paused') togglePause();
   }
   if (input.camera) camMode = 1 - camMode;
@@ -474,7 +521,20 @@ function frame(now: number) {
     while (acc >= STEP) { simulate(STEP); acc -= STEP; }
   } else acc = 0;
 
-  if (state === 'menu') {
+  if (state === 'select') {
+    // vitrine : la voiture tourne sur elle-même, caméra fixe un peu en hauteur
+    selSpin += dt * 0.6;
+    car.heading = selSpin;
+    const portrait = camera.aspect < 1;
+    const d = portrait ? 30 : 21;
+    camera.position.set(car.x + d * 0.75, car.y + d * 0.42, car.z + d * 0.75);
+    camera.lookAt(car.x, car.y + (portrait ? -0.6 : 1.1), car.z);
+    focusPoint.set(car.x, car.y + 1, car.z);
+    camPos.copy(camera.position); camTarget.set(car.x, car.y, car.z);
+    sun.position.set(car.x + 55, car.y + 120, car.z + 35);
+    sun.target.position.set(car.x, car.y, car.z);
+    if (dof) dof.cocMaterial.focusRange = 8;
+  } else if (state === 'menu') {
     // caméra qui tourne lentement autour de la voiture
     const t = now / 1000 * 0.15;
     camera.position.set(car.x + Math.sin(t) * 70, 38, car.z + Math.cos(t) * 70);
@@ -504,6 +564,8 @@ function frame(now: number) {
     }
   }
 
+  // le menu d'accueil couvre l'écran : inutile de dessiner la scène 3D
+  if (state === 'menu') return;
   if (composer) composer.render(dt);
   else renderer.render(scene, camera);
 }
@@ -518,7 +580,8 @@ const btnPlay = $('btnPlay') as HTMLButtonElement;
 btnPlay.disabled = true;
 loadAssets(isTouchDevice ? 'sd' : 'hd', (p) => { btnPlay.textContent = `CHARGEMENT ${Math.round(p * 100)} %`; }).then((assets) => {
   world = new World(scene, track, assets);
-  car.setModel(assets.models.car);
+  assetsRef = assets;
+  applyCar(carIdx);
   const p0 = track.at(-0.012, 0);
   car.place(p0.x, p0.z, p0.heading, track.roadTop);
   snapCamera();
@@ -533,4 +596,4 @@ loadAssets(isTouchDevice ? 'sd' : 'hd', (p) => { btnPlay.textContent = `CHARGEME
 });
 
 // accès debug (tests automatisés)
-(window as any).__game = { get dof() { return dof; }, get composer() { return composer; }, get ao() { return ao; }, get world() { return world; }, get ready() { return ready; }, get lap() { return lap; }, get lapTimes() { return lapTimes; }, get raceTime() { return raceTime; }, get trackIdx() { return trackIdx; }, car, track, input, get state() { return state; }, resetRace, respawn, simulate, setCam: (m: number) => (camMode = m), applyQuality };
+(window as any).__game = { get dof() { return dof; }, get composer() { return composer; }, get ao() { return ao; }, get world() { return world; }, get ready() { return ready; }, get lap() { return lap; }, get lapTimes() { return lapTimes; }, get raceTime() { return raceTime; }, get trackIdx() { return trackIdx; }, car, track, input, get state() { return state; }, openSelect, changeCar, startGame, resetRace, respawn, simulate, setCam: (m: number) => (camMode = m), applyQuality };

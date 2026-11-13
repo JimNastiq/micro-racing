@@ -54,21 +54,21 @@ export class World {
   }
 
   /** Hauteur du sol porteur sous (x,z) pour un objet dont le bas est à y */
-  groundAt(x: number, z: number, y: number): number {
+  groundAt(x: number, z: number, y: number, step = STEP_H): number {
     let g = FLOOR_Y;
     for (const p of this.platforms)
-      if (Math.abs(x - p.x) <= p.hw && Math.abs(z - p.z) <= p.hd && p.y <= y + STEP_H) g = Math.max(g, p.y);
+      if (Math.abs(x - p.x) <= p.hw && Math.abs(z - p.z) <= p.hd && p.y <= y + step) g = Math.max(g, p.y);
     if (Math.abs(x) <= TABLE_HW && Math.abs(z) <= TABLE_HD) {
       g = Math.max(g, 0);
       const n = this.road(x, z);
-      if (Math.abs(n.lateral) <= this.track.outerHalf && this.track.roadTop <= y + STEP_H) g = Math.max(g, this.track.roadTop);
+      if (Math.abs(n.lateral) <= this.track.outerHalf && this.track.roadTop <= y + step) g = Math.max(g, this.track.roadTop);
       for (const r of this.ramps) {
         const dx = x - r.x, dz = z - r.z;
         const c = Math.cos(r.rot), s = Math.sin(r.rot);
         const along = dx * c + dz * s, across = -dx * s + dz * c;
         if (Math.abs(along) <= r.hl && Math.abs(across) <= r.hw) {
           const h = r.height * (along + r.hl) / (2 * r.hl);
-          if (h <= y + STEP_H) g = Math.max(g, h);
+          if (h <= y + step) g = Math.max(g, h);
         }
       }
     }
@@ -76,19 +76,19 @@ export class World {
       const k = p.intervals(x, z, this.iv);
       for (let i = 0; i < k; i++) {
         const top = this.iv[i * 2 + 1];
-        if (top <= y + STEP_H && top > g) g = top;
+        if (top <= y + step && top > g) g = top;
       }
     }
     return g;
   }
 
   /** Un obstacle occupe-t-il le volume de la voiture en (x,z) ? */
-  blocked(x: number, z: number, y: number): boolean {
+  blocked(x: number, z: number, y: number, step = STEP_H): boolean {
     for (const p of this.props) {
       const k = p.intervals(x, z, this.iv);
       for (let i = 0; i < k; i++) {
         const bot = this.iv[i * 2], top = this.iv[i * 2 + 1];
-        if (top > y + STEP_H && bot < y + CAR_H) return true;
+        if (top > y + step && bot < y + CAR_H) return true;
       }
     }
     return false;

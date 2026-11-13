@@ -4,7 +4,7 @@ Course de petites voitures sur une table de cuisine géante (vue façon Micro Ma
 
 ## Jouer en ligne
 Chaque push sur `main` reconstruit le jeu et le publie sur GitHub Pages
-(`https://<ton-compte>.github.io/micro-racing/`), via `.github/workflows/deploy.yml`.
+(https://jimnastiq.github.io/micro-racing/), via `.github/workflows/deploy.yml`.
 
 ## Lancer
     npm install
@@ -31,3 +31,9 @@ Les modèles Meshy sont optimisés puis stockés dans `public/assets/*.model.jso
 - `src/assets.ts` : chargement + classe `Prop` (objet posé avec sa carte de hauteur)
 - La route est le tronçon droit Meshy répété et courbé le long du tracé (`Track.buildPieces`),
   le tracé suit le circuit peint sur la table.
+
+## Voitures
+Définies dans `src/cars.ts` : modèle 3D, caractéristiques affichées et réglages de conduite
+(vitesse, accélération, adhérence, hauteur de marche franchissable, gabarit).
+Pour en ajouter une : optimiser le GLB (`tools/optim2.mjs`), l'encoder dans `public/assets/{hd,sd}/<nom>.model.json`,
+ajouter son nom à `MODEL_NAMES` (`src/assets.ts`) puis une entrée dans `CARS`.
