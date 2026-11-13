@@ -1,10 +1,10 @@
-# Pocket Racers — prototype
+# Micro Racing — prototype
 
 Course de petites voitures sur une table de cuisine géante (vue façon Micro Machines, effet tilt-shift).
 
 ## Jouer en ligne
 Chaque push sur `main` reconstruit le jeu et le publie sur GitHub Pages
-(`https://<ton-compte>.github.io/pocket-racers/`), via `.github/workflows/deploy.yml`.
+(`https://<ton-compte>.github.io/micro-racing/`), via `.github/workflows/deploy.yml`.
 
 ## Lancer
     npm install

@@ -154,8 +154,8 @@ let startPressAt = -1; // instant (compte à rebours restant) du premier appui a
 let stallTime = 0;
 let camMode = 0;
 let shake = 0;
-let best = loadNum('pr_best_lap');
-let bestRace = loadNum('pr_best_race');
+let best = loadNum('mr_best_lap');
+let bestRace = loadNum('mr_best_race');
 
 function loadNum(k: string): number | null {
   try { const v = localStorage.getItem(k); return v ? parseFloat(v) : null; } catch { return null; }
@@ -209,7 +209,7 @@ function finishRace() {
   car.frozen = true;
   const total = raceTime;
   let newRecord = false;
-  if (bestRace === null || total < bestRace) { bestRace = total; saveNum('pr_best_race', total); newRecord = true; }
+  if (bestRace === null || total < bestRace) { bestRace = total; saveNum('mr_best_race', total); newRecord = true; }
   const bl = Math.min(...lapTimes);
   $('resTotal').textContent = fmt(total) + (newRecord ? '  ★ record !' : '');
   $('resLaps').innerHTML = lapTimes.map((t, i) => `<li class="${t === bl ? 'best' : ''}">Tour ${i + 1} — ${fmt(t)}</li>`).join('');
@@ -270,7 +270,7 @@ function completeLap() {
   lapStart = raceTime;
   sfx.lap();
   if (best === null || t < best) {
-    best = t; saveNum('pr_best_lap', t);
+    best = t; saveNum('mr_best_lap', t);
     message(`RECORD DU TOUR ! ${fmt(t)}`, 1.8, 'record');
   } else message(`Tour ${lap} — ${fmt(t)}`, 1.4);
   if (lap >= LAPS) { finishRace(); return; }
